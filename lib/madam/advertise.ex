@@ -31,6 +31,7 @@ defmodule Madam.Advertise do
     ]
 
     # ipv6 sockets aren't supported for multicast, even in OTP22
+    # https://stackoverflow.com/questions/38376640/cant-add-multicast-group
 
     # udp6_options = [
     #   :inet6,
