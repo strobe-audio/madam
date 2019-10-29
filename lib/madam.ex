@@ -53,23 +53,24 @@ defmodule Madam do
     {{172, 16, 0, 0}, {255, 240, 0, 0}}
   ]
 
-  @private_v6_ranges [
-    # fd00::/8
-    {{64768, 0, 0, 0, 0, 0, 0, 0}, {65280, 0, 0, 0, 0, 0, 0, 0}},
-    # fe80::/10
-    {{65152, 0, 0, 0, 0, 0, 0, 0}, {65535, 49152, 0, 0, 0, 0, 0, 0}}
-  ]
+  # @private_v6_ranges [
+  #   # fd00::/8
+  #   {{64768, 0, 0, 0, 0, 0, 0, 0}, {65280, 0, 0, 0, 0, 0, 0, 0}},
+  #   # fe80::/10
+  #   {{65152, 0, 0, 0, 0, 0, 0, 0}, {65535, 49152, 0, 0, 0, 0, 0, 0}}
+  # ]
 
   @private_v4 Enum.map(@private_v4_ranges, fn {ip, netmask} ->
                 {Madam.IP.ip_to_i(ip) &&& Madam.IP.ip_to_i(netmask), Madam.IP.ip_to_i(netmask)}
               end)
 
-  @private_v6 Enum.map(@private_v6_ranges, fn {ip, netmask} ->
-                {Madam.IP.ip_to_i(ip) &&& Madam.IP.ip_to_i(netmask), Madam.IP.ip_to_i(netmask)}
-              end)
+  # @private_v6 Enum.map(@private_v6_ranges, fn {ip, netmask} ->
+  #               {Madam.IP.ip_to_i(ip) &&& Madam.IP.ip_to_i(netmask), Madam.IP.ip_to_i(netmask)}
+  #             end)
 
   def private_network?(ipv6, netmask) when tuple_size(ipv6) == 8 and tuple_size(netmask) == 8 do
-    private_network?(ipv6, netmask, @private_v6)
+    false
+    # private_network?(ipv6, netmask, @private_v6)
   end
 
   def private_network?(ipv4, netmask) when tuple_size(ipv4) == 4 and tuple_size(netmask) == 4 do
@@ -77,7 +78,8 @@ defmodule Madam do
   end
 
   def private_network?({ipv6, netmask}) when tuple_size(ipv6) == 8 and tuple_size(netmask) == 8 do
-    private_network?(ipv6, netmask, @private_v6)
+    false
+    # private_network?(ipv6, netmask, @private_v6)
   end
 
   def private_network?({ipv4, netmask}) when tuple_size(ipv4) == 4 and tuple_size(netmask) == 4 do
