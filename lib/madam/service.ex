@@ -57,11 +57,11 @@ defmodule Madam.Service do
     service = Map.put(service, :hostname, generate_hostname(service))
     Registry.register(Madam.Service.Registry, {:ptr, domain}, [])
     Registry.register(Madam.Service.Registry, {:a, hostname(service)}, [])
-    {:ok, {{}, service}, random_timeout(:initial)}
+    {:ok, service, random_timeout(:initial)}
   end
 
   @impl true
-  def handle_info({:announce, :a, {_ip, _port} = addr, answers}, {_, service} = state) do
+  def handle_info({:announce, :a, {_ip, _port} = addr, answers}, service) do
     cached = Enum.map(answers, fn %{domain: instance, ttl: ttl} -> {to_string(instance), ttl} end)
 
     me = hostname(service, false)
@@ -71,10 +71,8 @@ defmodule Madam.Service do
         instance == me && ttl > service.ttl / 2
       end)
 
-    state =
       if is_cached? do
         Logger.debug(fn -> "Cached" end)
-        state
       else
         msg =
           :inet_dns.make_msg(
@@ -84,14 +82,13 @@ defmodule Madam.Service do
           )
 
         :ok = Madam.Advertise.dns_send(addr, [msg])
-        state
       end
 
-    {:noreply, state}
+    {:noreply, service}
   end
 
   @impl true
-  def handle_info({:announce, :ptr, {_ip, _port} = addr, answers}, {_, service} = state) do
+  def handle_info({:announce, :ptr, {_ip, _port} = addr, answers}, service) do
     cached = Enum.map(answers, fn %{data: instance, ttl: ttl} -> {to_string(instance), ttl} end)
 
     me = instance_name(service, false)
@@ -103,28 +100,25 @@ defmodule Madam.Service do
         instance == me && ttl > service.ttl / 2
       end)
 
-    state =
-      if is_cached? do
-        state
-      else
-        announce(addr, state)
+      unless is_cached? do
+        announce(addr, service)
       end
 
-    {:noreply, state}
+    {:noreply, service}
   end
 
-  def handle_info(:timeout, {_, service} = state) do
-    {:noreply, announce({}, state)}
+  def handle_info(:timeout, service) do
+    {:noreply, announce({}, service)}
   end
 
-  def handle_info(_msg, state) do
-    {:noreply, state}
+  def handle_info(_msg, service) do
+    {:noreply, service}
   end
 
-  defp announce(addr, {_, service} = state) do
+  defp announce(addr, service) do
     packets = packet(service)
     :ok = Madam.Advertise.dns_send(addr, packets)
-    state
+    service
   end
 
   defp packet(service) do

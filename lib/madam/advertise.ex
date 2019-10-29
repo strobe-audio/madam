@@ -82,7 +82,7 @@ defmodule Madam.Advertise do
     packets
     |> Stream.map(&:inet_dns.encode/1)
     |> Enum.each(fn packet ->
-      send_packet(state, src_address, packet)
+      :ok = send_packet(state, src_address, packet)
     end)
     {:reply, :ok, state}
   end
