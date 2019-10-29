@@ -24,12 +24,12 @@ defmodule Madam.Service do
     "#{service.name}.#{service_domain(service, fq)}"
   end
 
-  def hostname(%Service{} = service, fq \\ false) do
-    "#{service.name}.#{service_domain(service, fq)}"
-  end
-
   def service_domain(%Service{} = service, fq \\ false) do
     "_#{service.service}._#{service.protocol}.#{service.domain}#{if fq, do: ".", else: ""}"
+  end
+
+  def hostname(%Service{} = service, fq \\ false) do
+    "#{service.hostname}.#{service.domain}#{if fq, do: ".", else: ""}"
   end
 
   def advertise(config) do
@@ -38,7 +38,6 @@ defmodule Madam.Service do
   end
 
   def start_link(%Service{} = service) do
-    # IO.inspect(start_link: service)
     GenServer.start_link(__MODULE__, service)
   end
 
@@ -48,7 +47,8 @@ defmodule Madam.Service do
   end
 
   def generate_hostname(service) do
-    random = :crypto.strong_rand_bytes(4) |> Base.encode16(case: :lower)
+    # random = :crypto.strong_rand_bytes(4) |> Base.encode16(case: :lower)
+    random = "deadbeef"
     "#{service.service}-#{service.port}-#{random}"
   end
 
@@ -56,35 +56,79 @@ defmodule Madam.Service do
   def init(service) do
     domain = service_domain(service)
     service = Map.put(service, :hostname, generate_hostname(service))
-    Registry.register(Madam.Service.Registry, domain, [])
+    Registry.register(Madam.Service.Registry, {:ptr, domain}, [])
+    Registry.register(Madam.Service.Registry, {:a, hostname(service)}, [])
     {:ok, {{}, service}}
   end
 
   @impl true
-  def handle_info({:announce, {_ip, _port} = addr, _answers}, {_, service} = state) do
-    {:noreply, announce(addr, state)}
+  def handle_info({:announce, :a, {_ip, _port} = addr, answers}, {_, service} = state) do
+    cached = Enum.map(answers, fn %{domain: instance, ttl: ttl} -> {to_string(instance), ttl} end)
+
+    me = hostname(service, false)
+
+    is_cached? =
+      Enum.any?(cached, fn {instance, ttl} ->
+        instance == me && ttl > service.ttl / 2
+      end)
+
+    state =
+      if is_cached? do
+        Logger.debug(fn -> "Cached" end)
+        state
+      else
+        msg =
+          :inet_dns.make_msg(
+            header: header(),
+            anlist: anchors(addr, service),
+            arlist: []
+          )
+
+        :ok = Madam.Advertise.dns_send(addr, [msg])
+        state
+      end
+
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:announce, :ptr, {_ip, _port} = addr, answers}, {_, service} = state) do
+    cached = Enum.map(answers, fn %{data: instance, ttl: ttl} -> {to_string(instance), ttl} end)
+
+    me = instance_name(service, false)
+
+    # spec says to only re-send the zone if the version in the answers is at 50%
+    # of our ttl
+    is_cached? =
+      Enum.any?(cached, fn {instance, ttl} ->
+        instance == me && ttl > service.ttl / 2
+      end)
+
+    state =
+      if is_cached? do
+        state
+      else
+        announce(addr, state)
+      end
+
+    {:noreply, state}
   end
 
   # def handle_info(:timeout, {_, service} = state) do
   #   {:noreply, announce(state)}
   # end
 
-  def handle_info(msg, state) do
-    # IO.inspect(here: msg)
+  def handle_info(_msg, state) do
     {:noreply, state}
   end
 
   defp announce(addr, {_, service} = state) do
-    IO.inspect(announce: service)
     packets = packet(addr, service)
-    IO.inspect(send: addr)
     :ok = Madam.Advertise.dns_send(addr, packets)
     state
   end
 
   defp packet(addr, service) do
-    {:ok, hostname} = :inet.gethostname()
-
     msg =
       :inet_dns.make_msg(
         header: header(),
@@ -109,7 +153,7 @@ defmodule Madam.Service do
     )
   end
 
-  defp answers(addr, service) do
+  defp answers(_addr, service) do
     ptr =
       :inet_dns.make_rr(
         type: :ptr,
@@ -127,17 +171,15 @@ defmodule Madam.Service do
       instance_name(service, true)
     ])
 
-    records = [ptr]
+    [ptr]
   end
 
   defp resources(addr, service) do
-    services(addr, service) ++ texts(addr, service)
+    services(addr, service) ++ anchors(addr, service) ++ texts(addr, service)
   end
 
-  defp services({ip, _port}, service) do
-    # {:ok, hostname} = :inet.gethostname()
-    hostname = "what-is-this-34889"
-    target = to_charlist("#{service.hostname}.")
+  defp services({_ip, _port}, service) do
+    target = to_charlist(hostname(service, true))
 
     srv =
       :inet_dns.make_rr(
@@ -159,40 +201,42 @@ defmodule Madam.Service do
       target
     ])
 
-    host_ips = Madam.private_ips()
-
-    a =
-      host_ips
-      |> Enum.flat_map(fn ip ->
-        type =
-          case tuple_size(ip) do
-            4 -> :a
-            8 -> :aaaa
-          end
-
-        Logger.debug([
-          target,
-          " #{service.ttl} ",
-          " IN ",
-          " #{to_string(type) |> String.upcase()} ",
-          ip |> Tuple.to_list() |> Enum.join(".")
-        ])
-
-        [
-          :inet_dns.make_rr(
-            type: type,
-            domain: target,
-            class: :in,
-            ttl: service.ttl,
-            data: ip
-          )
-        ]
-      end)
-
-    [srv] ++ a
+    [srv]
   end
 
-  defp texts(addr, service) do
+  defp anchors(_addr, service) do
+    target = to_charlist(hostname(service, true))
+    host_ips = Madam.private_ips()
+
+    host_ips
+    |> Enum.flat_map(fn ip ->
+      type =
+        case tuple_size(ip) do
+          4 -> :a
+          8 -> :aaaa
+        end
+
+      Logger.debug([
+        target,
+        " #{service.ttl} ",
+        " IN ",
+        " #{to_string(type) |> String.upcase()} ",
+        ip |> Tuple.to_list() |> Enum.join(".")
+      ])
+
+      [
+        :inet_dns.make_rr(
+          type: type,
+          domain: target,
+          class: :in,
+          ttl: service.ttl,
+          data: ip
+        )
+      ]
+    end)
+  end
+
+  defp texts(_addr, service) do
     data = Enum.map(service.data, fn {k, v} -> to_charlist("#{k}=#{v}") end)
 
     txt =
@@ -212,8 +256,8 @@ defmodule Madam.Service do
     1_000
   end
 
-  def random_timeout(:announcements, ttl) do
-    # :crypto.rand_uniform(ttl * 100, ttl * 500) |> IO.inspect
+  def random_timeout(:announcements, _ttl) do
+    # :crypto.rand_uniform(ttl * 100, ttl * 500)
     5_000
   end
 end
