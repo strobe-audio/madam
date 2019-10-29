@@ -1,0 +1,9 @@
+%{
+  "base32": {:hex, :base32, "0.1.0", "044f6dc95709727ca2176f3e97a41ddaa76b5bc690d3536908618c0cb32616a2", [:rebar3], [], "hexpm"},
+  "bear": {:hex, :bear, "0.8.7", "16264309ae5d005d03718a5c82641fcc259c9e8f09adeb6fd79ca4271168656f", [:rebar3], [], "hexpm"},
+  "dns_erlang": {:git, "https://github.com/aetrion/dns_erlang.git", "a267a0a546f5ba27e62234bc9ac46f3168586f97", []},
+  "exdns": {:git, "https://github.com/dnsimple/exdns.git", "53b7fc780399eda96d42052e11e03d5eb0dcd789", []},
+  "exjsx": {:hex, :exjsx, "3.2.1", "1bc5bf1e4fd249104178f0885030bcd75a4526f4d2a1e976f4b428d347614f0f", [:mix], [{:jsx, "~> 2.8.0", [hex: :jsx, repo: "hexpm", optional: false]}], "hexpm"},
+  "folsom": {:hex, :folsom, "0.8.8", "9a2b02010f6727cb1948ef34e21cb66f3554b63355c3a31e8bcb10fb172c3170", [:rebar3], [{:bear, "0.8.7", [hex: :bear, repo: "hexpm", optional: false]}], "hexpm"},
+  "jsx": {:hex, :jsx, "2.8.3", "a05252d381885240744d955fbe3cf810504eb2567164824e19303ea59eef62cf", [:mix, :rebar3], [], "hexpm"},
+}
