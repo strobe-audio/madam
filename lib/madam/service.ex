@@ -47,8 +47,7 @@ defmodule Madam.Service do
   end
 
   def generate_hostname(service) do
-    # random = :crypto.strong_rand_bytes(4) |> Base.encode16(case: :lower)
-    random = "deadbeef"
+    random = :crypto.strong_rand_bytes(4) |> Base.encode16(case: :lower)
     "#{service.service}-#{service.port}-#{random}"
   end
 
@@ -58,7 +57,7 @@ defmodule Madam.Service do
     service = Map.put(service, :hostname, generate_hostname(service))
     Registry.register(Madam.Service.Registry, {:ptr, domain}, [])
     Registry.register(Madam.Service.Registry, {:a, hostname(service)}, [])
-    {:ok, {{}, service}}
+    {:ok, {{}, service}, random_timeout(:initial)}
   end
 
   @impl true
@@ -80,7 +79,7 @@ defmodule Madam.Service do
         msg =
           :inet_dns.make_msg(
             header: header(),
-            anlist: anchors(addr, service),
+            anlist: anchors(service),
             arlist: []
           )
 
@@ -114,26 +113,26 @@ defmodule Madam.Service do
     {:noreply, state}
   end
 
-  # def handle_info(:timeout, {_, service} = state) do
-  #   {:noreply, announce(state)}
-  # end
+  def handle_info(:timeout, {_, service} = state) do
+    {:noreply, announce({}, state)}
+  end
 
   def handle_info(_msg, state) do
     {:noreply, state}
   end
 
   defp announce(addr, {_, service} = state) do
-    packets = packet(addr, service)
+    packets = packet(service)
     :ok = Madam.Advertise.dns_send(addr, packets)
     state
   end
 
-  defp packet(addr, service) do
+  defp packet(service) do
     msg =
       :inet_dns.make_msg(
         header: header(),
-        anlist: answers(addr, service),
-        arlist: resources(addr, service)
+        anlist: answers(service),
+        arlist: resources(service)
       )
 
     [msg]
@@ -153,7 +152,7 @@ defmodule Madam.Service do
     )
   end
 
-  defp answers(_addr, service) do
+  defp answers(service) do
     ptr =
       :inet_dns.make_rr(
         type: :ptr,
@@ -174,11 +173,11 @@ defmodule Madam.Service do
     [ptr]
   end
 
-  defp resources(addr, service) do
-    services(addr, service) ++ anchors(addr, service) ++ texts(addr, service)
+  defp resources(service) do
+    services(service) ++ anchors(service) ++ texts(service)
   end
 
-  defp services({_ip, _port}, service) do
+  defp services(service) do
     target = to_charlist(hostname(service, true))
 
     srv =
@@ -204,7 +203,7 @@ defmodule Madam.Service do
     [srv]
   end
 
-  defp anchors(_addr, service) do
+  defp anchors(service) do
     target = to_charlist(hostname(service, true))
     host_ips = Madam.private_ips()
 
@@ -236,7 +235,7 @@ defmodule Madam.Service do
     end)
   end
 
-  defp texts(_addr, service) do
+  defp texts(service) do
     data = Enum.map(service.data, fn {k, v} -> to_charlist("#{k}=#{v}") end)
 
     txt =
@@ -252,8 +251,7 @@ defmodule Madam.Service do
   end
 
   def random_timeout(:initial) do
-    # :crypto.rand_uniform(500, 1500)
-    1_000
+    :crypto.rand_uniform(500, 1500)
   end
 
   def random_timeout(:announcements, _ttl) do

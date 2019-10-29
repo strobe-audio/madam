@@ -57,11 +57,15 @@ defmodule Madam.Advertise do
     {:ok, state}
   end
 
-  defp send_packet(state, address, @port, packet) when tuple_size(address) == 4 do
+  defp send_packet(state, {}, packet) do
     :gen_udp.send(state.socket4, @address4, @port, packet)
   end
 
-  defp send_packet(state, address, port, packet) when tuple_size(address) == 4 do
+  defp send_packet(state, {address, @port}, packet) when tuple_size(address) == 4 do
+    :gen_udp.send(state.socket4, @address4, @port, packet)
+  end
+
+  defp send_packet(state, {address, port}, packet) when tuple_size(address) == 4 do
     :gen_udp.send(state.socket4, address, port, packet)
   end
 
@@ -73,11 +77,11 @@ defmodule Madam.Advertise do
   #   :gen_udp.send(state.socket6, address, port, packet)
   # end
 
-  def handle_call({:dns_send, {ip, port}, packets}, _from, state) do
+  def handle_call({:dns_send, src_address, packets}, _from, state) do
     packets
     |> Stream.map(&:inet_dns.encode/1)
     |> Enum.each(fn packet ->
-      send_packet(state, ip, port, packet)
+      send_packet(state, src_address, packet)
     end)
     {:reply, :ok, state}
   end
