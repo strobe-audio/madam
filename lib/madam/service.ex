@@ -22,7 +22,7 @@ defmodule Madam.Service do
   ]
 
   def instance_name(service, fq \\ false) do
-    "#{service.name}.#{service_domain(service, fq)}"
+    "#{escape_name(service.name)}.#{service_domain(service, fq)}"
   end
 
   def service_domain(service, fq \\ false)
@@ -42,6 +42,10 @@ defmodule Madam.Service do
   def advertise(config) do
     service = struct(__MODULE__, config)
     Service.Supervisor.advertise(service)
+  end
+
+  defp escape_name(name) do
+    String.replace(name, ".", "\\.")
   end
 
   def start_link(%Service{} = service) do

@@ -35,7 +35,7 @@ defmodule Madam.UDP do
       {:ip, @address4},
       {:multicast_if, @address4},
       {:multicast_ttl, 4},
-      {:multicast_loop, false},
+      {:multicast_loop, true},
       {:broadcast, true},
       {:add_membership, {@address4, @bind4}},
       {:active, true}
