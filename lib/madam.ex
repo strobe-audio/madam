@@ -15,10 +15,20 @@ defmodule Madam do
 
   import Madam.IP
 
+  require Logger
+
   def response_ips(src_ip) do
     {:ok, ifaddrs} = :inet.getifaddrs()
 
-    Enum.flat_map(ifaddrs, &find_if(&1, src_ip, tuple_size(src_ip)))
+    ips =
+      Enum.flat_map(ifaddrs, &find_if(&1, src_ip, tuple_size(src_ip)))
+    Logger.debug(fn ->
+      [
+        "Response ips src: #{inspect(src_ip)}",
+        " response: #{inspect(ips)}"
+      ]
+    end)
+    ips
   end
 
   defp find_if({_name, opts}, src_ip, 4) do
@@ -26,7 +36,6 @@ defmodule Madam do
       opts
       |> Keyword.get_values(:addr)
       |> Enum.filter(fn addr -> tuple_size(addr) == 4 end)
-      |> IO.inspect()
 
     netmasks =
       opts

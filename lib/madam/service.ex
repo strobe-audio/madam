@@ -44,6 +44,26 @@ defmodule Madam.Service do
     Service.Supervisor.advertise(service)
   end
 
+  def split_name(name) do
+    split_name(name, <<>>, [])
+  end
+
+  defp split_name(<<>>, part, acc) do
+    Enum.reverse([part | acc])
+  end
+
+  defp split_name(<<"\\", ".", rest::binary>>, part, acc) do
+    split_name(rest, part <> ".", acc)
+  end
+
+  defp split_name(<<".", rest::binary>>, part, acc) do
+    split_name(rest, "", [part | acc])
+  end
+
+  defp split_name(<<c::binary-1, rest::binary>>, part, acc) do
+    split_name(rest, part <> c, acc)
+  end
+
   defp escape_name(name) do
     String.replace(name, ".", "\\.")
   end
@@ -127,17 +147,17 @@ defmodule Madam.Service do
   end
 
   defp announce(addr, service) do
-    packets = packet(service)
+    packets = packet(addr, service)
     :ok = Madam.Advertise.dns_send(addr, packets)
     service
   end
 
-  defp packet(service) do
+  defp packet(addr, service) do
     msg =
       :inet_dns.make_msg(
         header: header(),
         anlist: answers(service),
-        arlist: resources(service)
+        arlist: resources(addr, service)
       )
 
     [msg]
@@ -178,8 +198,8 @@ defmodule Madam.Service do
     [ptr]
   end
 
-  defp resources(service) do
-    services(service) ++ anchors(service) ++ texts(service)
+  defp resources(addr, service) do
+    services(service) ++ anchors(addr, service) ++ texts(service)
   end
 
   defp services(service) do
@@ -209,10 +229,24 @@ defmodule Madam.Service do
   end
 
   defp anchors(service) do
-    target = to_charlist(hostname(service, true))
-    host_ips = Madam.private_ips()
+    ips = Madam.private_ips()
+    anchors_for_ips(ips, service)
+  end
 
-    host_ips
+  defp anchors({}, service) do
+    ips = Madam.private_ips()
+    anchors_for_ips(ips, service)
+  end
+
+  defp anchors({ip, _port}, service) do
+    ips = Madam.response_ips(ip)
+    anchors_for_ips(ips, service)
+  end
+
+  defp anchors_for_ips(ips, service) do
+    target = to_charlist(hostname(service, true))
+
+    ips
     |> Enum.flat_map(fn ip ->
       type =
         case tuple_size(ip) do

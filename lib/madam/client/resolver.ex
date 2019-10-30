@@ -23,21 +23,22 @@ defmodule Madam.Client.Resolver do
     {:ok, state, {:continue, {:resolve, timeout}}}
   end
 
-  def handle_continue({:resolve, timeout}, state) do
+  def handle_continue({:resolve, timeout}, state) when is_integer(timeout) do
     %{from: from} = state
-
-    queries = queries(state)
 
     msg =
       :inet_dns.make_msg(
         header: header(),
-        qdlist: queries
+        qdlist: queries(state)
       )
-
     packet = :inet_dns.encode(msg)
+
     {:ok, socket} = Madam.UDP.open(:resolve)
+
     :ok = Madam.UDP.send(socket, packet)
-    ref = Process.send_after(self(), :timeout, timeout)
+
+    _ref = Process.send_after(self(), :timeout, timeout)
+
     {:noreply, %{state | socket: socket}}
   end
 
@@ -107,19 +108,21 @@ defmodule Madam.Client.Resolver do
 
         with {:ok, srv} <- find_srv(resources, instance),
              [_ | _] = a <- find_a(resources, srv),
-             [_ | _] = txt <- find_txt(resources, instance) do
-          IO.inspect(result: [srv: srv, a: a, txt: txt])
-          %{data: {priority, weight, port, host}} = srv
+             [_ | _] = txt <- find_txt(resources, instance),
+             %{data: {priority, weight, port, host}} <- srv do
 
           data =
             txt
             |> Enum.flat_map(&Map.fetch!(&1, :data))
             |> Enum.reject(&(byte_size(&1) == 0))
 
+          [hostname | _rest] = Service.split_name(host)
+          [name | _rest] = Service.split_name(instance)
+
           params =
             Keyword.merge(service_opts,
-              name: instance,
-              hostname: host,
+              name: name,
+              hostname: hostname,
               port: port,
               priority: priority,
               data: data,
