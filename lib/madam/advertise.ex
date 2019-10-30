@@ -114,8 +114,9 @@ defmodule Madam.Advertise do
     {:noreply, state}
   end
 
-  defp handle_record(src_addr, :msg, false, :query, [%{domain: domain, type: type}], answers, [], [], state) do
+  defp handle_record(src_addr, :msg, false, :query, [%{domain: domain, type: type} = query], answers, [], [], state) do
     domain = to_string(domain)
+    IO.inspect query
     Registry.dispatch(Madam.Service.Registry, {type, domain}, fn entries ->
       for {pid, _opts} <- entries, do: send(pid, {:announce, type, src_addr, answers})
     end)
@@ -125,7 +126,6 @@ defmodule Madam.Advertise do
   defp handle_record(_src_addr, :msg, true, :query, [], _answers, [], _resources, state) do
     state
   end
-
 
   defp handle_record(_srcaddr, _type, _qr, _opcode, _questions, _answers, _authorities, _resources, state) do
     state

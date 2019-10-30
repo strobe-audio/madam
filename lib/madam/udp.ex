@@ -1,6 +1,8 @@
 defmodule Madam.UDP do
   @address {224, 0, 0, 251}
+  @address4 {224, 0, 0, 251}
   @port 5353
+  @bind4 {0, 0, 0, 0}
 
   # [{multicast_if, InterfaceIP},
   #  {reuseaddr, true},
@@ -25,7 +27,31 @@ defmodule Madam.UDP do
     end
   end
 
+  def open(:resolve) do
+    udp4_options = [
+      :inet,
+      {:mode, :binary},
+      {:reuseaddr, true},
+      {:ip, @address4},
+      {:multicast_if, @address4},
+      {:multicast_ttl, 4},
+      {:multicast_loop, false},
+      {:broadcast, true},
+      {:add_membership, {@address4, @bind4}},
+      {:active, true}
+    ]
+    open(@port, udp4_options)
+  end
+
   defp open(port, opts) do
     :gen_udp.open(port, opts)
+  end
+
+  def send(socket, msg) do
+    :gen_udp.send(socket, @address4, @port, msg)
+  end
+
+  def close(socket) do
+    :gen_udp.close(socket)
   end
 end

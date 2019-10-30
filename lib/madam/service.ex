@@ -17,15 +17,22 @@ defmodule Madam.Service do
     domain: "local",
     ttl: 120,
     weight: 10,
-    priority: 10
+    priority: 10,
+    addrs: []
   ]
 
   def instance_name(service, fq \\ false) do
     "#{service.name}.#{service_domain(service, fq)}"
   end
 
-  def service_domain(%Service{} = service, fq \\ false) do
+  def service_domain(service, fq \\ false)
+
+  def service_domain(%Service{} = service, fq) do
     "_#{service.service}._#{service.protocol}.#{service.domain}#{if fq, do: ".", else: ""}"
+  end
+
+  def service_domain(service, fq) when is_list(service) do
+    "_#{service[:service]}._#{service[:protocol]}.#{service[:domain]}#{if fq, do: ".", else: ""}"
   end
 
   def hostname(%Service{} = service, fq \\ false) do

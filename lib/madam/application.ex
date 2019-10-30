@@ -10,7 +10,9 @@ defmodule Madam.Application do
       {Registry, keys: :duplicate, name: Madam.Service.Registry},
       {Madam.Advertise, []},
       Madam.Service.Supervisor,
-      {Madam.Service, name: "This is Bug Fish", port: 1033, service: "erlang", data: [this: "that"]}
+      {Madam.Service, name: "This is Bug Fish", port: 1033, service: "erlang", data: [this: "that"]},
+      Madam.Client,
+      Madam.Client.Supervisor,
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
