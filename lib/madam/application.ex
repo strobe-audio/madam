@@ -10,7 +10,7 @@ defmodule Madam.Application do
       {Registry, keys: :duplicate, name: Madam.Service.Registry},
       {Madam.Advertise, []},
       Madam.Service.Supervisor,
-      {Madam.Service, name: "This is XXX. Fish", port: 1033, service: "erlang", data: [this: "that"]},
+      {Madam.Service, name: "This is XXX. Fish", port: 1033, service: "erlang", data: [:someFlag, this: "that"]},
       Madam.Client,
       Madam.Client.Supervisor,
     ]

@@ -275,7 +275,7 @@ defmodule Madam.Service do
   end
 
   defp texts(service) do
-    data = Enum.map(service.data, fn {k, v} -> to_charlist("#{k}=#{v}") end)
+    data = Madam.DNS.encode_txt(service.data)
 
     txt =
       :inet_dns.make_rr(

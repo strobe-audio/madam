@@ -31,6 +31,7 @@ defmodule Madam.Client.Resolver do
         header: header(),
         qdlist: queries(state)
       )
+
     packet = :inet_dns.encode(msg)
 
     {:ok, socket} = Madam.UDP.open(:resolve)
@@ -110,11 +111,10 @@ defmodule Madam.Client.Resolver do
              [_ | _] = a <- find_a(resources, srv),
              [_ | _] = txt <- find_txt(resources, instance),
              %{data: {priority, weight, port, host}} <- srv do
-
           data =
             txt
             |> Enum.flat_map(&Map.fetch!(&1, :data))
-            |> Enum.reject(&(byte_size(&1) == 0))
+            |> Madam.DNS.decode_txt()
 
           [hostname | _rest] = Service.split_name(host)
           [name | _rest] = Service.split_name(instance)
