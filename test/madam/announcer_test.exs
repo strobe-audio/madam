@@ -3,18 +3,25 @@ defmodule Madam.AnnouncerTest do
 
   alias Madam.DNS
 
-  @local_addr Madam.private_ips() |> hd()
+  # construct a dns question that appears to come from a network interface we're listening on,
+  # from some other server on that network
+  {:ok, [{ifname, addrs} | _]} = Madam.Network.interfaces()
+
+  @local_ifname ifname
+  @local_addr addrs
 
   @qu_addr @local_addr
+           |> hd()
            |> then(fn {a, b, c, d} -> {a, b, c, max(1, Integer.mod(d + 1, 255))} end)
-           |> IO.inspect()
 
   @question %DNS.Msg{
+    ifaddr: @local_addr,
+    ifname: @local_ifname,
     addr: @qu_addr,
     answers: [],
     opcode: :query,
     qr: false,
-    questions: [%DNS.RR{class: :in, domain: "_hap._tcp.local", type: :ptr}],
+    questions: [%DNS.Query{class: :in, domain: "_hap._tcp.local", type: :ptr}],
     resources: [],
     type: :msg
   }
@@ -60,29 +67,19 @@ defmodule Madam.AnnouncerTest do
 
     assert_receive {:broadcast, msg}
 
-    IO.inspect(broadcast: msg)
-
     assert msg.answers == [
              %Madam.DNS.RR{
                class: :in,
-               data: 'My service._hap._tcp.local.',
-               domain: '_hap._tcp.local.',
+               data: 'My service._hap._tcp.local',
+               domain: '_hap._tcp.local',
                ttl: 120,
                type: :ptr
              }
            ]
 
-    assert msg.questions == [
-             %Madam.DNS.RR{
-               class: :in,
-               data: nil,
-               domain: "_hap._tcp.local",
-               ttl: nil,
-               type: :ptr
-             }
-           ]
+    assert msg.questions == []
 
-    for ip <- Madam.response_ips(@qu_addr) do
+    for ip <- Madam.Network.response_ips(@qu_addr) do
       assert Enum.find(msg.resources, fn r -> r.type == :a and r.data == ip end)
     end
 
@@ -98,33 +95,9 @@ defmodule Madam.AnnouncerTest do
     assert %Madam.DNS.RR{
              class: :in,
              data: {10, 10, 1033, 'hap-1033-' ++ _},
-             domain: 'My service._hap._tcp.local.',
+             domain: 'My service._hap._tcp.local',
              ttl: 120,
              type: :srv
            } = Enum.find(msg.resources, fn r -> r.type == :srv end)
-
-    # assert service == %Madam.Service{
-    #          addrs: [{192, 168, 1, 152}],
-    #          data: %{
-    #            "c#" => "189",
-    #            "ci" => "2",
-    #            "ff" => "1",
-    #            "id" => "C9:D4:73:0C:86:6A",
-    #            "md" => "TRADFRI gateway",
-    #            "pv" => "1.1",
-    #            "s#" => "541",
-    #            "sf" => "0",
-    #            "sh" => "xn3qeA=="
-    #          },
-    #          domain: "_hap._tcp.local",
-    #          hostname: "TRADFRI-Gateway-b072bf25d7e3.local",
-    #          name: "TRADFRI gateway",
-    #          port: 80,
-    #          priority: 0,
-    #          protocol: :tcp,
-    #          service: "hap",
-    #          ttl: 4500,
-    #          weight: 0
-    #        }
   end
 end

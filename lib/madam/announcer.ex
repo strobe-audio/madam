@@ -5,6 +5,28 @@ defmodule Madam.Announcer do
 
   require Logger
 
+  def child_spec(args) do
+    case Keyword.fetch(args, :service) do
+      {:ok, service_spec} ->
+        %{
+          id: child_spec_id(service_spec),
+          start: {__MODULE__, :start_link, [args]}
+        }
+
+      :error ->
+        raise ArgumentError,
+          message: "#{__MODULE__} arguments missing required :service definition"
+    end
+  end
+
+  defp child_spec_id(%Madam.Service{} = service) do
+    {__MODULE__, service.service}
+  end
+
+  defp child_spec_id(service) when is_list(service) do
+    {__MODULE__, service[:service]}
+  end
+
   def start_link(args) do
     GenServer.start_link(__MODULE__, args)
   end
@@ -18,8 +40,12 @@ defmodule Madam.Announcer do
     service = Madam.Service.new(service_opts)
     domain = Madam.Service.service_domain(service) |> IO.inspect()
 
+    IO.inspect(srv: domain)
     Registry.register(Madam.Service.Registry, {:srv, domain}, [])
+    IO.inspect(a: service.hostname)
     Registry.register(Madam.Service.Registry, {:a, service.hostname}, [])
+    IO.inspect(a: Service.instance_name(service, false))
+    Registry.register(Madam.Service.Registry, {:a, Service.instance_name(service, false)}, [])
 
     {:ok, %{service: service, udp: udp}, random_timeout(:initial)}
   end
@@ -32,8 +58,28 @@ defmodule Madam.Announcer do
   end
 
   @impl true
-  def handle_info({Madam, :query, %DNS.Msg{} = msg}, state) do
+  def handle_info({Madam, {:query, :ptr}, %DNS.Msg{} = msg}, state) do
     :ok = announce(msg, state)
+
+    {:noreply, state}
+  end
+
+  def handle_info({Madam, {:query, :a}, %DNS.Msg{} = msg}, state) do
+    # TODO: if the msg with the query for the service contains a list
+    # of answers, and one of those answers has a domain set to the current
+    # hostname, then the if the answer's ttl is > (the service ttl / 2)
+    # the response is cached and we don't need to send one
+    response = %{
+      msg
+      | qr: true,
+        aa: true,
+        opcode: :query,
+        questions: [],
+        answers: anchors(msg, state.service),
+        resources: []
+    }
+
+    send_msg(response, state)
 
     {:noreply, state}
   end
@@ -68,6 +114,10 @@ defmodule Madam.Announcer do
   end
 
   defp announce(msg, state) do
+    # TODO: if the msg with the query for the service contains a list
+    # of answers, and one of those answers has a domain set to the current
+    # hostname, then the if the answer's ttl is > (the service ttl / 2)
+    # the response is cached and we don't need to send one
     response = %{
       msg
       | qr: true,
@@ -78,9 +128,13 @@ defmodule Madam.Announcer do
         resources: resources(msg, state.service)
     }
 
+    send_msg(response, state)
+  end
+
+  defp send_msg(msg, state) do
     {module, args} = state.udp
 
-    apply(module, :broadcast, [response | args])
+    apply(module, :broadcast, [msg | args])
   end
 
   defp answers(service) do
@@ -134,11 +188,6 @@ defmodule Madam.Announcer do
     ])
 
     [srv]
-  end
-
-  defp anchors(%DNS.Msg{ifaddr: []} = msg, service) do
-    ips = Madam.private_ips()
-    anchors(%{msg | ifaddr: ips}, service)
   end
 
   defp anchors(msg, service) do

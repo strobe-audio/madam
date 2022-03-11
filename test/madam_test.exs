@@ -30,13 +30,13 @@ defmodule MadamTest do
 
     for {ip, netmask} <- private_ipsv4 do
       test "#{Macro.to_string(ip)}/#{Macro.to_string(netmask)} is private" do
-        assert Madam.private_network?(unquote(ip), unquote(netmask))
+        assert Madam.Network.private_network?(unquote(ip), unquote(netmask))
       end
     end
 
     for {ip, netmask} <- public_ipsv4 do
       test "#{Macro.to_string(ip)}/#{Macro.to_string(netmask)} is public" do
-        refute Madam.private_network?(unquote(ip), unquote(netmask))
+        refute Madam.Network.private_network?(unquote(ip), unquote(netmask))
       end
     end
 
@@ -45,5 +45,35 @@ defmodule MadamTest do
     #     assert Madam.private_network?(unquote(ip), unquote(netmask))
     #   end
     # end
+  end
+
+  describe "services/0" do
+    test "service enumeration works" do
+      {:ok, _pid} =
+        start_supervised(
+          {Madam.Announcer,
+           service: [name: "My service", port: 1033, service: "hap", data: %{something: "here"}],
+           udp: {UDPMonitor, [[parent: self()]]}}
+        )
+
+      {:ok, _pid} =
+        start_supervised(
+          {Madam.Announcer,
+           service: [name: "My service", port: 1033, service: "madam", data: %{something: "here"}],
+           udp: {UDPMonitor, [[parent: self()]]}}
+        )
+
+      {:ok, _pid} =
+        start_supervised(
+          {Madam.Announcer,
+           service: [name: "My service", port: 1033, service: "peep", data: %{something: "here"}],
+           udp: {UDPMonitor, [[parent: self()]]}}
+        )
+
+      assert Madam.services()
+             |> Enum.map(& &1.domain)
+             |> Enum.sort() ==
+               Enum.sort(["_hap._tcp.local", "_madam._tcp.local", "_peep._tcp.local"])
+    end
   end
 end

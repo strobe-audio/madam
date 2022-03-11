@@ -102,7 +102,7 @@ defmodule Madam.Service do
     "_#{service.service}._#{service.protocol}.#{service.domain}#{if fq, do: ".", else: ""}"
   end
 
-  def service_domain(%Service{} = service, fq) when is_list(service) do
+  def service_domain(service, fq) when is_list(service) do
     "_#{service[:service]}._#{service[:protocol]}.#{service[:domain]}#{if fq, do: ".", else: ""}"
   end
 
@@ -224,8 +224,9 @@ defmodule Madam.Service do
 
   defp announce(addr, service) do
     packets = packet(addr, service)
-    IO.inspect(announce: addr, service: service)
+
     :ok = Madam.Advertise.dns_send(addr, packets)
+
     service
   end
 
@@ -306,17 +307,17 @@ defmodule Madam.Service do
   end
 
   defp anchors(service) do
-    ips = Madam.private_ips()
+    ips = Madam.Network.private_ips()
     anchors_for_ips(ips, service)
   end
 
   defp anchors({}, service) do
-    ips = Madam.private_ips()
+    ips = Madam.Network.private_ips()
     anchors_for_ips(ips, service)
   end
 
   defp anchors({ip, _port}, service) do
-    ips = Madam.response_ips(ip)
+    ips = Madam.Network.response_ips(ip)
     anchors_for_ips(ips, service)
   end
 

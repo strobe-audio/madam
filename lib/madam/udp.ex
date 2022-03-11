@@ -12,11 +12,14 @@ defmodule Madam.UDP.Supervisor do
   def init(_args) do
     {:ok, interfaces} = Madam.Network.interfaces()
 
-    children =
-      Enum.map(interfaces, &Supervisor.child_spec({Madam.UDP, &1}, id: &1)) |> IO.inspect()
+    children = Enum.map(interfaces, &Supervisor.child_spec({Madam.UDP, &1}, id: &1))
 
     Supervisor.init(children, strategy: :one_for_one)
   end
+end
+
+defmodule Madam.Transport do
+  @callback broadcast(DNS.Msg.t(), Keyword.t()) :: :ok | {:error, term()}
 end
 
 defmodule Madam.UDP do
@@ -24,18 +27,16 @@ defmodule Madam.UDP do
 
   alias Madam.DNS
 
-  @callback broadcast(DNS.Msg.t(), Keyword.t()) :: :ok | {:error, term()}
-
-  @address {224, 0, 0, 251}
   @address4 {224, 0, 0, 251}
   @port 5353
-  @bind4 {0, 0, 0, 0}
+
+  @behaviour Madam.Transport
 
   def start_link({ifname, ips}) do
     GenServer.start_link(__MODULE__, {ifname, ips}, name: Madam.UDP.Supervisor.name(ifname))
   end
 
-  @impl __MODULE__
+  @impl Madam.Transport
   def broadcast(msg, opts \\ [])
 
   def broadcast(%{ifname: nil} = msg, opts) do
@@ -133,9 +134,9 @@ defmodule Madam.UDP do
   #   end
   # end
 
-  @sol_socket 0xFFFF
-  @so_reuseport 0x0200
-  @so_reuseaddr 0x0004
+  # @sol_socket 0xFFFF
+  # @so_reuseport 0x0200
+  # @so_reuseaddr 0x0004
 
   defp open(ifname, [addr | _]) do
     udp4_options = [
@@ -149,23 +150,15 @@ defmodule Madam.UDP do
       {:broadcast, true},
       {:add_membership, {@address4, addr}},
       {:active, true},
-      {:bind_to_device, ifname},
-      {:raw, @sol_socket, @so_reuseport, <<1::native-32>>}
+      {:bind_to_device, ifname}
+      # {:raw, @sol_socket, @so_reuseport, <<1::native-32>>}
     ]
 
     :gen_udp.open(@port, udp4_options)
   end
 
-  # defp open(port, opts) do
-  #   :gen_udp.open(port, opts)
-  # end
-
   defp udp_send(socket, msg) do
     :gen_udp.send(socket, @address4, @port, msg)
-  end
-
-  defp close(socket) do
-    :gen_udp.close(socket)
   end
 
   defp questions(record) do
