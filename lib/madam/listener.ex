@@ -29,7 +29,7 @@ defmodule Madam.Listener do
   end
 
   def handle_cast({:query, service}, state) do
-    Logger.warn(fn -> ["QUERY ", inspect(service)] end)
+    Logger.info(fn -> ["QUERY ", inspect(service)] end)
 
     msg = %DNS.Msg{
       questions: [

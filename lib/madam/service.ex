@@ -182,13 +182,10 @@ defmodule Madam.Service do
     {_module, _opts} = udp = Keyword.get(args, :udp, {Madam.UDP, []})
 
     service = Madam.Service.new(service_opts)
-    domain = Madam.Service.domain(service) |> IO.inspect()
+    domain = Madam.Service.domain(service)
 
-    IO.inspect(srv: domain)
     Registry.register(Madam.Service.Registry, {:srv, domain}, [])
-    IO.inspect(a: service.hostname)
     Registry.register(Madam.Service.Registry, {:a, service.hostname}, [])
-    IO.inspect(a: Service.instance_name(service, false))
     Registry.register(Madam.Service.Registry, {:a, Service.instance_name(service, false)}, [])
 
     {:ok, %{service: service, udp: udp}, random_timeout(:initial)}
@@ -196,7 +193,6 @@ defmodule Madam.Service do
 
   @impl true
   def handle_continue(:announce, state) do
-    IO.inspect(announce: state.service, udp: state.udp)
     :ok = announce(nil, state)
     {:noreply, state}
   end
