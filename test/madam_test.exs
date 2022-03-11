@@ -40,10 +40,10 @@ defmodule MadamTest do
       end
     end
 
-    for {ip, netmask} <- private_ipsv6 do
-      test "#{Macro.to_string(ip)}/#{Macro.to_string(netmask)} is private" do
-        assert Madam.private_network?(unquote(ip), unquote(netmask))
-      end
-    end
+    # for {ip, netmask} <- private_ipsv6 do
+    #   test "#{Macro.to_string(ip)}/#{Macro.to_string(netmask)} is private" do
+    #     assert Madam.private_network?(unquote(ip), unquote(netmask))
+    #   end
+    # end
   end
 end

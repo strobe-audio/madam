@@ -1,11 +1,103 @@
 defmodule Madam.DNS do
+  defprotocol Encoder do
+    @spec encode(t()) :: tuple()
+    def encode(t)
+  end
+
+  defmodule Msg do
+    defstruct id: 0,
+              ifname: nil,
+              ifaddr: [],
+              addr: nil,
+              questions: [],
+              answers: [],
+              resources: [],
+              type: :msg,
+              aa: true,
+              qr: true,
+              opcode: :query
+
+    defimpl Encoder do
+      def encode(msg) do
+        :inet_dns.make_msg(
+          header: header(msg),
+          anlist: rr(msg.answers),
+          arlist: rr(msg.resources),
+          qdlist: rr(msg.questions)
+        )
+      end
+
+      defp header(msg) do
+        :inet_dns.make_header(
+          id: msg.id,
+          qr: msg.qr,
+          opcode: msg.opcode,
+          aa: msg.aa,
+          tc: false,
+          rd: false,
+          ra: false,
+          pr: false,
+          rcode: 0
+        )
+      end
+
+      defp rr(rr) do
+        Enum.map(rr, &Encoder.encode/1)
+      end
+    end
+  end
+
+  defmodule RR do
+    defstruct [:type, :domain, :ttl, data: nil, class: :in]
+
+    def new(params) do
+      struct(__MODULE__, params)
+    end
+
+    defimpl Encoder do
+      def encode(rr) do
+        rr
+        |> Map.from_struct()
+        |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+        |> :inet_dns.make_rr()
+      end
+    end
+  end
+
+  defmodule Query do
+    @enforce_keys [:domain]
+    defstruct [:domain, type: :a, class: :in]
+
+    def new(params) do
+      struct(__MODULE__, params)
+    end
+
+    defimpl Encoder do
+      def encode(query) do
+        :inet_dns.make_dns_query(
+          class: query.class,
+          type: query.type,
+          domain: to_charlist(query.domain)
+        )
+      end
+    end
+  end
+
+  def encode(msg) do
+    msg
+    |> Encoder.encode()
+    |> :inet_dns.encode()
+  end
+
   def encode_txt(values) do
     values
     |> Enum.map(fn
       {k, v} ->
         k = k |> to_string() |> String.downcase()
         to_charlist("#{k}=#{v}")
-      k -> to_charlist(k)
+
+      k ->
+        to_charlist(k)
     end)
     |> case do
       [] -> ['']
@@ -34,4 +126,72 @@ defmodule Madam.DNS do
         {String.downcase(k), v}
     end
   end
+
+  # %Madam.DNS.Msg{
+  #   addr: {},
+  #   answers: [
+  #     %Madam.DNS.RR{
+  #       class: :in,
+  #       data: 'This is XXX\\. Fish._erlang._tcp.local',
+  #       domain: '_erlang._tcp.local',
+  #       ttl: 120,
+  #       type: :ptr
+  #     }
+  #   ],
+  #   opcode: :query,
+  #   qr: true,
+  #   questions: [],
+  #   resources: [
+  #     %Madam.DNS.RR{
+  #       class: :in,
+  #       data: {10, 10, 1033, 'erlang-1033-f4ffb728.local'},
+  #       domain: '_erlang._tcp.local',
+  #       ttl: 120,
+  #       type: :srv
+  #     },
+  #     %Madam.DNS.RR{
+  #       class: :in,
+  #       data: {192, 168, 1, 203},
+  #       domain: 'erlang-1033-f4ffb728.local',
+  #       ttl: 120,
+  #       type: :a
+  #     },
+  #     %Madam.DNS.RR{
+  #       class: :in,
+  #       data: {192, 168, 1, 235},
+  #       domain: 'erlang-1033-f4ffb728.local',
+  #       ttl: 120,
+  #       type: :a
+  #     },
+  #     %Madam.DNS.RR{
+  #       class: :in,
+  #       data: {10, 251, 251, 40},
+  #       domain: 'erlang-1033-f4ffb728.local',
+  #       ttl: 120,
+  #       type: :a
+  #     },
+  #     %Madam.DNS.RR{
+  #       class: :in,
+  #       data: {172, 18, 0, 1},
+  #       domain: 'erlang-1033-f4ffb728.local',
+  #       ttl: 120,
+  #       type: :a
+  #     },
+  #     %Madam.DNS.RR{
+  #       class: :in,
+  #       data: {172, 17, 0, 1},
+  #       domain: 'erlang-1033-f4ffb728.local',
+  #       ttl: 120,
+  #       type: :a
+  #     },
+  #     %Madam.DNS.RR{
+  #       class: :in,
+  #       data: ['someFlag', 'this=that'],
+  #       domain: '_erlang._tcp.local',
+  #       ttl: 120,
+  #       type: :txt
+  #     }
+  #   ],
+  #   type: :msg
+  # }
 end

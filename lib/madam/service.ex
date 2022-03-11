@@ -12,7 +12,7 @@ defmodule Madam.Service do
     :port,
     :service,
     :hostname,
-    data: [],
+    data: %{},
     protocol: :tcp,
     domain: "local",
     ttl: 120,
@@ -20,6 +20,77 @@ defmodule Madam.Service do
     priority: 10,
     addrs: []
   ]
+
+  def new(%__MODULE__{} = service) do
+    put_hostname(service)
+  end
+
+  def new(params) when is_list(params) do
+    __MODULE__
+    |> struct(params)
+    |> put_hostname()
+  end
+
+  defp put_hostname(%{hostname: empty} = service) when empty in [nil, ""] do
+    %{service | hostname: generate_hostname(service)}
+  end
+
+  def from_dns(%Madam.DNS.Msg{answers: answers, resources: resources}) do
+    records = Enum.concat(answers, resources)
+
+    Enum.reduce(
+      records,
+      %__MODULE__{data: %{}, name: "", port: 0, service: ""},
+      &build_from_dns/2
+    )
+  end
+
+  defp build_from_dns(%{type: :txt, data: data}, service) do
+    %{service | data: Map.merge(service.data, Madam.DNS.decode_txt(data))}
+  end
+
+  defp build_from_dns(%{type: :srv, data: {priority, weight, port, host}}, service) do
+    %{service | priority: priority, weight: weight, port: port, hostname: to_string(host)}
+  end
+
+  defp build_from_dns(%{type: :ptr, data: data, domain: <<"_", domain::binary>> = d} = r, service) do
+    name =
+      case split_name(data) do
+        [name | _] ->
+          name
+
+        _other ->
+          ""
+      end
+
+    service =
+      case String.split(domain, ".") do
+        [s, "_tcp", "local"] ->
+          %{service | ttl: r.ttl, service: s, protocol: :tcp}
+
+        [s, "_udp", "local"] ->
+          %{service | ttl: r.ttl, service: s, protocol: :udp}
+
+        _other ->
+          Logger.warn(fn -> ["weird srv record: ", d] end)
+          %{service | ttl: r.ttl, service: d}
+      end
+
+    %{service | name: name, domain: d}
+  end
+
+  defp build_from_dns(%{type: :a, data: ip}, %{addrs: addrs} = service) do
+    %{service | addrs: [ip | addrs]}
+  end
+
+  defp build_from_dns(%{type: :aaaa, data: _ip}, %{addrs: _addrs} = service) do
+    # %{service | addrs: [ip | addrs]}
+    service
+  end
+
+  defp build_from_dns(_rr, service) do
+    service
+  end
 
   def instance_name(service, fq \\ false) do
     "#{escape_name(service.name)}.#{service_domain(service, fq)}"
@@ -31,8 +102,12 @@ defmodule Madam.Service do
     "_#{service.service}._#{service.protocol}.#{service.domain}#{if fq, do: ".", else: ""}"
   end
 
-  def service_domain(service, fq) when is_list(service) do
+  def service_domain(%Service{} = service, fq) when is_list(service) do
     "_#{service[:service]}._#{service[:protocol]}.#{service[:domain]}#{if fq, do: ".", else: ""}"
+  end
+
+  def service_domain(service, protocol, domain) do
+    "_#{service}._#{protocol}.#{domain}"
   end
 
   def hostname(%Service{} = service, fq \\ false) do
@@ -85,7 +160,7 @@ defmodule Madam.Service do
   @impl true
   def init(service) do
     domain = service_domain(service)
-    service = Map.put(service, :hostname, generate_hostname(service))
+    service = Map.put_new(service, :hostname, generate_hostname(service))
     Registry.register(Madam.Service.Registry, {:ptr, domain}, [])
     Registry.register(Madam.Service.Registry, {:a, hostname(service)}, [])
     {:ok, service, random_timeout(:initial)}
@@ -102,18 +177,19 @@ defmodule Madam.Service do
         instance == me && ttl > service.ttl / 2
       end)
 
-      if is_cached? do
-        Logger.debug(fn -> "Cached" end)
-      else
-        msg =
-          :inet_dns.make_msg(
-            header: header(),
-            anlist: anchors(service),
-            arlist: []
-          )
+    if is_cached? do
+      Logger.debug(fn -> "Cached" end)
+    else
+      msg =
+        :inet_dns.make_msg(
+          header: header(),
+          anlist: anchors(service),
+          arlist: []
+        )
 
-        :ok = Madam.Advertise.dns_send(addr, [msg])
-      end
+      IO.inspect(send: addr, msg: msg)
+      :ok = Madam.Advertise.dns_send(addr, [msg])
+    end
 
     {:noreply, service}
   end
@@ -131,9 +207,9 @@ defmodule Madam.Service do
         instance == me && ttl > service.ttl / 2
       end)
 
-      unless is_cached? do
-        announce(addr, service)
-      end
+    unless is_cached? do
+      announce(addr, service)
+    end
 
     {:noreply, service}
   end
@@ -148,6 +224,7 @@ defmodule Madam.Service do
 
   defp announce(addr, service) do
     packets = packet(addr, service)
+    IO.inspect(announce: addr, service: service)
     :ok = Madam.Advertise.dns_send(addr, packets)
     service
   end
@@ -290,7 +367,7 @@ defmodule Madam.Service do
   end
 
   def random_timeout(:initial) do
-    :crypto.rand_uniform(500, 1500)
+    :rand.uniform(1500) + 499
   end
 
   def random_timeout(:announcements, _ttl) do

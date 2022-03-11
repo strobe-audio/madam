@@ -17,17 +17,26 @@ defmodule Madam do
 
   require Logger
 
+  def subscribe(service, opts \\ []) do
+    protocol = Keyword.get(opts, :protocol, :tcp)
+
+    domain = Madam.Service.service_domain(service, protocol, "local")
+
+    Madam.Listener.subscribe(domain)
+  end
+
   def response_ips(src_ip) do
     {:ok, ifaddrs} = :inet.getifaddrs()
 
-    ips =
-      Enum.flat_map(ifaddrs, &find_if(&1, src_ip, tuple_size(src_ip)))
+    ips = Enum.flat_map(ifaddrs, &find_if(&1, src_ip, tuple_size(src_ip)))
+
     Logger.debug(fn ->
       [
         "Response ips src: #{inspect(src_ip)}",
         " response: #{inspect(ips)}"
       ]
     end)
+
     ips
   end
 

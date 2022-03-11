@@ -6,13 +6,26 @@ defmodule Madam.Application do
   use Application
 
   def start(_type, _args) do
+    IO.inspect(__MODULE__)
+
     children = [
       {Registry, keys: :duplicate, name: Madam.Service.Registry},
-      {Madam.Advertise, []},
-      Madam.Service.Supervisor,
-      {Madam.Service, name: "This is XXX. Fish", port: 1033, service: "erlang", data: [:someFlag, this: "that"]},
-      Madam.Client,
-      Madam.Client.Supervisor,
+      {Registry, keys: :unique, name: Madam.Interface.Registry},
+      Madam.Listener,
+      Madam.UDP.Supervisor
+      # {Madam.Advertise, []},
+      # Madam.Service.Supervisor,
+      # # just a dummy service to test things
+      # {Madam.Announcer,
+      #  service: [
+      #    name: "This is XXX. Fish",
+      #    port: 1033,
+      #    service: "erlang",
+      #    data: [:someFlag, this: "that"]
+      #  ]}
+      # Madam.Client,
+      # Madam.Client.Supervisor,
+      # Madam.Receiver
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

@@ -1,11 +1,6 @@
 # Madam
 
-**TODO: Add description**
-
-## Installation
-
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `madam` to your list of dependencies in `mix.exs`:
+Services offered...
 
 ```elixir
 def deps do
@@ -15,7 +10,85 @@ def deps do
 end
 ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at [https://hexdocs.pm/madam](https://hexdocs.pm/madam).
+## Server
+
+``` elixir
+# advertise the "_ssh._tcp.local" service
+
+service = %Madam.Service{
+  # required information
+  name: "My service instance name",
+  port: 22,
+  service: "ssh",
+
+  # optional data for service consumers
+  data: %{
+    someFlag: true,
+    someValue: "present"
+  },
+
+  # defaults 
+  protocol: :tcp,
+  domain: "local",
+  ttl: 120,
+  weight: 10,
+  priority: 10
+}
+
+# run as part of your application's supervision tree
+
+defmodule MyApplication.Application do
+  use Application
+
+  def start(_type, _args) do
+    service = Madam.Service{
+      # ...
+    }
+
+    children = [
+      {Madam.Service, service: service}
+    ]
+
+    Supervisor.start_link(children, strategy: :one_for_one, name: MyApplication.Supervisor)
+  end
+end
+
+
+# advertise an ad-hoc service
+
+Madam.advertise(service)
+
+```
+
+## Client
+
+``` elixir
+
+
+# receive notifications of services being offered
+# this should be run from a process (`GenServer`)
+# which will receive messages when a new instance
+# appears on the local network
+
+
+# default protocol is `:tcp` so this will 
+defmodule Subscriber do
+  use GenServer
+  
+  # ...
+
+  def init(_) do
+    Madam.subscribe("ssh")
+    {:ok, []}
+  end
+  
+  def handle_info({Madam, :announce, %Madam.Service{} = service}, state) do
+    # do something with the new service
+    state = handle_service(service, state)
+
+    {:noreply, state}
+  end
+end
+
+```
 
