@@ -8,7 +8,7 @@ defmodule Madam.Service.Supervisor do
   end
 
   def advertise(service) do
-    DynamicSupervisor.start_child(__MODULE__, {Madam.Service, service})
+    DynamicSupervisor.start_child(__MODULE__, {Madam.Service, service: service})
   end
 
   @impl true

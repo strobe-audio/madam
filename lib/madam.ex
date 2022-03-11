@@ -7,6 +7,10 @@ defmodule Madam do
     Madam.Listener.subscribe(domain)
   end
 
+  def advertise(service) do
+    Madam.Service.Supervisor.advertise(service)
+  end
+
   def services do
     spec = [{{{:srv, :"$1"}, :"$2", :_}, [], [%{domain: :"$1", pid: :"$2"}]}]
 

@@ -29,7 +29,6 @@ service = %Madam.Service{
 
   # defaults 
   protocol: :tcp,
-  domain: "local",
   ttl: 120,
   weight: 10,
   priority: 10

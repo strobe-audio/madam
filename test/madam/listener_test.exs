@@ -98,7 +98,6 @@ defmodule Madam.ListenerTest do
                "sf" => "0",
                "sh" => "xn3qeA=="
              },
-             domain: "_hap._tcp.local",
              hostname: "TRADFRI-Gateway-b072bf25d7e3.local",
              name: "TRADFRI gateway",
              port: 80,

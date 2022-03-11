@@ -15,7 +15,6 @@ defmodule Madam.Service do
     :hostname,
     data: %{},
     protocol: :tcp,
-    domain: "local",
     ttl: 120,
     weight: 10,
     priority: 10,
@@ -77,7 +76,7 @@ defmodule Madam.Service do
           %{service | ttl: r.ttl, service: d}
       end
 
-    %{service | name: name, domain: d}
+    %{service | name: name}
   end
 
   defp build_from_dns(%{type: :a, data: ip}, %{addrs: addrs} = service) do
@@ -100,19 +99,19 @@ defmodule Madam.Service do
   def domain(service, fq \\ false)
 
   def domain(%Service{} = service, fq) do
-    "_#{service.service}._#{service.protocol}.#{service.domain}#{if fq, do: ".", else: ""}"
+    "_#{service.service}._#{service.protocol}.local#{if fq, do: ".", else: ""}"
   end
 
   def domain(service, fq) when is_list(service) do
-    "_#{service[:service]}._#{service[:protocol]}.#{service[:domain]}#{if fq, do: ".", else: ""}"
+    "_#{service[:service]}._#{service[:protocol]}.local#{if fq, do: ".", else: ""}"
   end
 
-  def domain(service, protocol, domain) do
-    "_#{service}._#{protocol}.#{domain}"
+  def domain(service, protocol, _domain) do
+    "_#{service}._#{protocol}.local"
   end
 
   def hostname(%Service{} = service, fq \\ false) do
-    "#{service.hostname}.#{service.domain}#{if fq, do: ".", else: ""}"
+    "#{service.hostname}.local#{if fq, do: ".", else: ""}"
   end
 
   def advertise(config) do

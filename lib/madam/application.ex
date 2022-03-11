@@ -8,7 +8,8 @@ defmodule Madam.Application do
       {Registry, keys: :duplicate, name: Madam.Service.Registry},
       {Registry, keys: :unique, name: Madam.Interface.Registry},
       Madam.Listener,
-      Madam.UDP.Supervisor
+      Madam.UDP.Supervisor,
+      Madam.Service.Supervisor
       # {Madam.Service,
       #  service: [
       #    name: "Madam",
