@@ -1,4 +1,4 @@
-defmodule Madam.AnnouncerTest do
+defmodule Madam.ServiceTest do
   use ExUnit.Case, async: false
 
   alias Madam.DNS
@@ -58,7 +58,7 @@ defmodule Madam.AnnouncerTest do
     {:ok, _pid} = start_supervised({Watcher, domain: "hap", parent: self()})
 
     start_supervised(
-      {Madam.Announcer,
+      {Madam.Service,
        service: [name: "My service", port: 1033, service: "hap", data: %{something: "here"}],
        udp: {UDPMonitor, [[parent: self()]]}}
     )

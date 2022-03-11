@@ -6,6 +6,7 @@ defmodule Madam.Service do
   require Logger
 
   alias __MODULE__
+  alias Madam.DNS
 
   defstruct [
     :name,
@@ -93,20 +94,20 @@ defmodule Madam.Service do
   end
 
   def instance_name(service, fq \\ false) do
-    "#{escape_name(service.name)}.#{service_domain(service, fq)}"
+    "#{escape_name(service.name)}.#{domain(service, fq)}"
   end
 
-  def service_domain(service, fq \\ false)
+  def domain(service, fq \\ false)
 
-  def service_domain(%Service{} = service, fq) do
+  def domain(%Service{} = service, fq) do
     "_#{service.service}._#{service.protocol}.#{service.domain}#{if fq, do: ".", else: ""}"
   end
 
-  def service_domain(service, fq) when is_list(service) do
+  def domain(service, fq) when is_list(service) do
     "_#{service[:service]}._#{service[:protocol]}.#{service[:domain]}#{if fq, do: ".", else: ""}"
   end
 
-  def service_domain(service, protocol, domain) do
+  def domain(service, protocol, domain) do
     "_#{service}._#{protocol}.#{domain}"
   end
 
@@ -143,157 +144,184 @@ defmodule Madam.Service do
     String.replace(name, ".", "\\.")
   end
 
-  def start_link(%Service{} = service) do
-    GenServer.start_link(__MODULE__, service)
-  end
-
-  def start_link(opts) when is_list(opts) do
-    service = struct(__MODULE__, opts)
-    start_link(service)
-  end
-
   def generate_hostname(service) do
     random = :crypto.strong_rand_bytes(4) |> Base.encode16(case: :lower)
     "#{service.service}-#{service.port}-#{random}"
   end
 
-  @impl true
-  def init(service) do
-    domain = service_domain(service)
-    service = Map.put_new(service, :hostname, generate_hostname(service))
-    Registry.register(Madam.Service.Registry, {:ptr, domain}, [])
-    Registry.register(Madam.Service.Registry, {:a, hostname(service)}, [])
-    {:ok, service, random_timeout(:initial)}
-  end
+  def child_spec(args) do
+    case Keyword.fetch(args, :service) do
+      {:ok, service_spec} ->
+        %{
+          id: child_spec_id(service_spec),
+          start: {__MODULE__, :start_link, [args]}
+        }
 
-  @impl true
-  def handle_info({:announce, :a, {_ip, _port} = addr, answers}, service) do
-    cached = Enum.map(answers, fn %{domain: instance, ttl: ttl} -> {to_string(instance), ttl} end)
-
-    me = hostname(service, false)
-
-    is_cached? =
-      Enum.any?(cached, fn {instance, ttl} ->
-        instance == me && ttl > service.ttl / 2
-      end)
-
-    if is_cached? do
-      Logger.debug(fn -> "Cached" end)
-    else
-      msg =
-        :inet_dns.make_msg(
-          header: header(),
-          anlist: anchors(service),
-          arlist: []
-        )
-
-      IO.inspect(send: addr, msg: msg)
-      :ok = Madam.Advertise.dns_send(addr, [msg])
+      :error ->
+        raise ArgumentError,
+          message: "#{__MODULE__} arguments missing required :service definition"
     end
+  end
 
-    {:noreply, service}
+  defp child_spec_id(%Madam.Service{} = service) do
+    {__MODULE__, service.service}
+  end
+
+  defp child_spec_id(service) when is_list(service) do
+    {__MODULE__, service[:service]}
+  end
+
+  def start_link(args) do
+    GenServer.start_link(__MODULE__, args)
   end
 
   @impl true
-  def handle_info({:announce, :ptr, {_ip, _port} = addr, answers}, service) do
-    cached = Enum.map(answers, fn %{data: instance, ttl: ttl} -> {to_string(instance), ttl} end)
+  def init(args) do
+    {:ok, service_opts} = Keyword.fetch(args, :service)
 
-    me = instance_name(service, false)
+    {_module, _opts} = udp = Keyword.get(args, :udp, {Madam.UDP, []})
 
-    # spec says to only re-send the zone if the version in the answers is at 50%
-    # of our ttl
-    is_cached? =
-      Enum.any?(cached, fn {instance, ttl} ->
-        instance == me && ttl > service.ttl / 2
-      end)
+    service = Madam.Service.new(service_opts)
+    domain = Madam.Service.domain(service) |> IO.inspect()
 
-    unless is_cached? do
-      announce(addr, service)
-    end
+    IO.inspect(srv: domain)
+    Registry.register(Madam.Service.Registry, {:srv, domain}, [])
+    IO.inspect(a: service.hostname)
+    Registry.register(Madam.Service.Registry, {:a, service.hostname}, [])
+    IO.inspect(a: Service.instance_name(service, false))
+    Registry.register(Madam.Service.Registry, {:a, Service.instance_name(service, false)}, [])
 
-    {:noreply, service}
+    {:ok, %{service: service, udp: udp}, random_timeout(:initial)}
   end
 
-  def handle_info(:timeout, service) do
-    {:noreply, announce({}, service)}
+  @impl true
+  def handle_continue(:announce, state) do
+    IO.inspect(announce: state.service, udp: state.udp)
+    :ok = announce(nil, state)
+    {:noreply, state}
   end
 
-  def handle_info(_msg, service) do
-    {:noreply, service}
+  @impl true
+  def handle_info({Madam, {:query, :ptr}, %DNS.Msg{} = msg}, state) do
+    :ok = announce(msg, state)
+
+    {:noreply, state}
   end
 
-  defp announce(addr, service) do
-    packets = packet(addr, service)
+  def handle_info({Madam, {:query, :a}, %DNS.Msg{} = msg}, state) do
+    # TODO: if the msg with the query for the service contains a list
+    # of answers, and one of those answers has a domain set to the current
+    # hostname, then the if the answer's ttl is > (the service ttl / 2)
+    # the response is cached and we don't need to send one
+    response = %{
+      msg
+      | qr: true,
+        aa: true,
+        opcode: :query,
+        questions: [],
+        answers: anchors(msg, state.service),
+        resources: []
+    }
 
-    :ok = Madam.Advertise.dns_send(addr, packets)
+    send_msg(response, state)
 
-    service
+    {:noreply, state}
   end
 
-  defp packet(addr, service) do
-    msg =
-      :inet_dns.make_msg(
-        header: header(),
-        anlist: answers(service),
-        arlist: resources(addr, service)
-      )
+  def handle_info(:timeout, state) do
+    Logger.info(fn ->
+      [
+        "Announcing service ",
+        Service.domain(state.service),
+        ":",
+        to_string(state.service.port)
+      ]
+    end)
 
-    [msg]
+    :ok = announce(nil, state)
+    {:noreply, state}
   end
 
-  defp header do
-    :inet_dns.make_header(
-      id: 0,
-      qr: true,
-      opcode: :query,
-      aa: true,
-      tc: false,
-      rd: false,
-      ra: false,
-      pr: false,
-      rcode: 0
-    )
+  defp announce(nil, state) do
+    # construct a set of fake source messages, one for each interface/ip address we're listening
+    # on so that we can send out a bunch of DNS messages with each A entry matching the interface
+    # it's being sent out on
+    Madam.UDP.list()
+    |> Enum.map(fn {_pid, address} ->
+      %DNS.Msg{
+        ifname: address.ifname,
+        ifaddr: address.ifaddrs,
+        addr: {}
+      }
+    end)
+    |> Enum.each(&announce(&1, state))
+  end
+
+  defp announce(msg, state) do
+    # TODO: if the msg with the query for the service contains a list
+    # of answers, and one of those answers has a domain set to the current
+    # hostname, then the if the answer's ttl is > (the service ttl / 2)
+    # the response is cached and we don't need to send one
+    response = %{
+      msg
+      | qr: true,
+        aa: true,
+        opcode: :query,
+        questions: [],
+        answers: answers(state.service),
+        resources: resources(msg, state.service)
+    }
+
+    send_msg(response, state)
+  end
+
+  defp send_msg(msg, state) do
+    {module, args} = state.udp
+
+    apply(module, :broadcast, [msg | args])
   end
 
   defp answers(service) do
-    ptr =
-      :inet_dns.make_rr(
-        type: :ptr,
-        domain: service_domain(service, true) |> to_charlist(),
-        class: :in,
-        ttl: service.ttl,
-        data: to_charlist(instance_name(service, true))
-      )
+    ptrs(service)
+  end
+
+  defp ptrs(service) do
+    ptr = %DNS.RR{
+      type: :ptr,
+      domain: Service.domain(service, false) |> to_charlist(),
+      class: :in,
+      ttl: service.ttl,
+      data: to_charlist(Service.instance_name(service, false))
+    }
 
     Logger.debug([
-      service_domain(service, true),
+      Service.domain(service, false),
       " #{service.ttl} ",
       " IN ",
       " PTR ",
-      instance_name(service, true)
+      Service.instance_name(service, false)
     ])
 
     [ptr]
   end
 
-  defp resources(addr, service) do
-    services(service) ++ anchors(addr, service) ++ texts(service)
+  defp resources(msg, service) do
+    services(service) ++ anchors(msg, service) ++ texts(service)
   end
 
   defp services(service) do
-    target = to_charlist(hostname(service, true))
+    target = to_charlist(Service.hostname(service, false))
 
-    srv =
-      :inet_dns.make_rr(
-        type: :srv,
-        domain: instance_name(service, true) |> to_charlist(),
-        class: :in,
-        ttl: service.ttl,
-        data: {service.priority, service.weight, service.port, target}
-      )
+    srv = %DNS.RR{
+      type: :srv,
+      domain: Service.instance_name(service, false) |> to_charlist(),
+      class: :in,
+      ttl: service.ttl,
+      data: {service.priority, service.weight, service.port, target}
+    }
 
     Logger.debug([
-      instance_name(service, true),
+      Service.instance_name(service, false),
       " #{service.ttl} ",
       " IN ",
       " SRV ",
@@ -306,23 +334,12 @@ defmodule Madam.Service do
     [srv]
   end
 
-  defp anchors(service) do
-    ips = Madam.Network.private_ips()
-    anchors_for_ips(ips, service)
+  defp anchors(msg, service) do
+    anchors_for_ips(msg.ifaddr, service)
   end
 
-  defp anchors({}, service) do
-    ips = Madam.Network.private_ips()
-    anchors_for_ips(ips, service)
-  end
-
-  defp anchors({ip, _port}, service) do
-    ips = Madam.Network.response_ips(ip)
-    anchors_for_ips(ips, service)
-  end
-
-  defp anchors_for_ips(ips, service) do
-    target = to_charlist(hostname(service, true))
+  defp anchors_for_ips(ips, service) when is_list(ips) do
+    target = to_charlist(Service.hostname(service, false))
 
     ips
     |> Enum.flat_map(fn ip ->
@@ -341,38 +358,26 @@ defmodule Madam.Service do
       ])
 
       [
-        :inet_dns.make_rr(
-          type: type,
-          domain: target,
-          class: :in,
-          ttl: service.ttl,
-          data: ip
-        )
+        %DNS.RR{type: type, domain: target, class: :in, ttl: service.ttl, data: ip}
       ]
     end)
   end
 
   defp texts(service) do
-    data = Madam.DNS.encode_txt(service.data)
+    data = DNS.encode_txt(service.data)
 
-    txt =
-      :inet_dns.make_rr(
-        domain: instance_name(service) |> to_charlist(),
-        type: :txt,
-        class: :in,
-        ttl: service.ttl,
-        data: data
-      )
+    txt = %DNS.RR{
+      domain: Service.instance_name(service, false) |> to_charlist(),
+      type: :txt,
+      class: :in,
+      ttl: service.ttl,
+      data: data
+    }
 
     [txt]
   end
 
   def random_timeout(:initial) do
     :rand.uniform(1500) + 499
-  end
-
-  def random_timeout(:announcements, _ttl) do
-    # :crypto.rand_uniform(ttl * 100, ttl * 500)
-    5_000
   end
 end

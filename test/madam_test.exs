@@ -18,15 +18,15 @@ defmodule MadamTest do
       Macro.escape({{172, 32, 3, 12}, {255, 240, 0, 0}})
     ]
 
-    private_ipsv6 = [
-      Macro.escape(
-        {{65152, 0, 0, 0, 8456, 42002, 59216, 40057}, {65535, 65535, 65535, 65535, 0, 0, 0, 0}}
-      ),
-      Macro.escape(
-        {{64896, 22210, 57884, 55356, 61593, 37632, 13572, 23113},
-         {65535, 65535, 65535, 65535, 65535, 65280, 0, 0}}
-      )
-    ]
+    # private_ipsv6 = [
+    #   Macro.escape(
+    #     {{65152, 0, 0, 0, 8456, 42002, 59216, 40057}, {65535, 65535, 65535, 65535, 0, 0, 0, 0}}
+    #   ),
+    #   Macro.escape(
+    #     {{64896, 22210, 57884, 55356, 61593, 37632, 13572, 23113},
+    #      {65535, 65535, 65535, 65535, 65535, 65280, 0, 0}}
+    #   )
+    # ]
 
     for {ip, netmask} <- private_ipsv4 do
       test "#{Macro.to_string(ip)}/#{Macro.to_string(netmask)} is private" do
@@ -51,21 +51,21 @@ defmodule MadamTest do
     test "service enumeration works" do
       {:ok, _pid} =
         start_supervised(
-          {Madam.Announcer,
+          {Madam.Service,
            service: [name: "My service", port: 1033, service: "hap", data: %{something: "here"}],
            udp: {UDPMonitor, [[parent: self()]]}}
         )
 
       {:ok, _pid} =
         start_supervised(
-          {Madam.Announcer,
+          {Madam.Service,
            service: [name: "My service", port: 1033, service: "madam", data: %{something: "here"}],
            udp: {UDPMonitor, [[parent: self()]]}}
         )
 
       {:ok, _pid} =
         start_supervised(
-          {Madam.Announcer,
+          {Madam.Service,
            service: [name: "My service", port: 1033, service: "peep", data: %{something: "here"}],
            udp: {UDPMonitor, [[parent: self()]]}}
         )

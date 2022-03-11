@@ -2,7 +2,7 @@ defmodule Madam do
   def subscribe(service, opts \\ []) do
     protocol = Keyword.get(opts, :protocol, :tcp)
 
-    domain = Madam.Service.service_domain(service, protocol, "local")
+    domain = Madam.Service.domain(service, protocol, "local")
 
     Madam.Listener.subscribe(domain)
   end

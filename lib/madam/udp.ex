@@ -76,9 +76,10 @@ defmodule Madam.UDP do
   @impl GenServer
   def handle_call({:broadcast, msg, _opts}, _from, state) do
     %{socket: socket} = state
-    IO.inspect(udp_broadcast: msg)
+
     packet = DNS.encode(msg)
     result = udp_send(socket, packet)
+
     {:reply, result, state}
   end
 
@@ -88,8 +89,8 @@ defmodule Madam.UDP do
 
   @impl GenServer
   def handle_info({:udp, _socket, addr, _port, data}, state) do
-    # IO.inspect(udp: addr, port: port)
     {:ok, record} = :inet_dns.decode(data)
+
     header = :inet_dns.header(:inet_dns.msg(record, :header))
 
     msg = %DNS.Msg{
