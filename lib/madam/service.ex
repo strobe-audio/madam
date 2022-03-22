@@ -244,6 +244,7 @@ defmodule Madam.Service do
     Madam.UDP.list()
     |> Enum.map(fn {_pid, address} ->
       %DNS.Msg{
+        qr: false,
         ifname: address.ifname,
         ifaddr: address.ifaddrs,
         addr: {}
