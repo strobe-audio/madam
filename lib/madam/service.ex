@@ -72,7 +72,7 @@ defmodule Madam.Service do
           %{service | ttl: r.ttl, service: s, protocol: :udp}
 
         _other ->
-          Logger.warn(fn -> ["weird srv record: ", d] end)
+          Logger.warning(fn -> ["weird srv record: ", d] end)
           %{service | ttl: r.ttl, service: d}
       end
 
@@ -264,8 +264,8 @@ defmodule Madam.Service do
         aa: true,
         opcode: :query,
         questions: [],
-        answers: answers(state.service),
-        resources: resources(msg, state.service)
+        answers: answers(state.service) ++ resources(msg, state.service),
+        resources: []
     }
 
     send_msg(response, state)

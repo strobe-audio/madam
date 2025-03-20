@@ -1,9 +1,8 @@
 %{
-  "base32": {:hex, :base32, "0.1.0", "044f6dc95709727ca2176f3e97a41ddaa76b5bc690d3536908618c0cb32616a2", [:rebar3], [], "hexpm"},
-  "bear": {:hex, :bear, "0.8.7", "16264309ae5d005d03718a5c82641fcc259c9e8f09adeb6fd79ca4271168656f", [:rebar3], [], "hexpm"},
-  "dns_erlang": {:git, "https://github.com/aetrion/dns_erlang.git", "a267a0a546f5ba27e62234bc9ac46f3168586f97", []},
-  "exdns": {:git, "https://github.com/dnsimple/exdns.git", "53b7fc780399eda96d42052e11e03d5eb0dcd789", []},
-  "exjsx": {:hex, :exjsx, "3.2.1", "1bc5bf1e4fd249104178f0885030bcd75a4526f4d2a1e976f4b428d347614f0f", [:mix], [{:jsx, "~> 2.8.0", [hex: :jsx, repo: "hexpm", optional: false]}], "hexpm"},
-  "folsom": {:hex, :folsom, "0.8.8", "9a2b02010f6727cb1948ef34e21cb66f3554b63355c3a31e8bcb10fb172c3170", [:rebar3], [{:bear, "0.8.7", [hex: :bear, repo: "hexpm", optional: false]}], "hexpm"},
-  "jsx": {:hex, :jsx, "2.8.3", "a05252d381885240744d955fbe3cf810504eb2567164824e19303ea59eef62cf", [:mix, :rebar3], [], "hexpm"},
+  "base32": {:hex, :base32, "0.1.0", "044f6dc95709727ca2176f3e97a41ddaa76b5bc690d3536908618c0cb32616a2", [:rebar3], [], "hexpm", "10a73951d857d8cb1eceea8eb96c6941f6a76e105947ad09c2b73977dee07638"},
+  "bear": {:hex, :bear, "0.8.7", "16264309ae5d005d03718a5c82641fcc259c9e8f09adeb6fd79ca4271168656f", [:rebar3], [], "hexpm", "534217dce6a719d59e54fb0eb7a367900dbfc5f85757e8c1f94269df383f6d9b"},
+  "dns_erlang": {:hex, :dns_erlang, "2.0.0", "2c6e08842101ac04ffd634abf7e2761a92f010ecd824ad950e9b5478f25d6f37", [:rebar3], [{:base32, "~> 0.1.0", [hex: :base32, repo: "hexpm", optional: false]}], "hexpm", "3c68246bc17c375fdb187e2d75951a83850257fcabc47e52e447ebad5f34b690"},
+  "exjsx": {:hex, :exjsx, "3.2.1", "1bc5bf1e4fd249104178f0885030bcd75a4526f4d2a1e976f4b428d347614f0f", [:mix], [{:jsx, "~> 2.8.0", [hex: :jsx, repo: "hexpm", optional: false]}], "hexpm", "b55727b206dab96feb025267e5c122ddb448f55b6648f9156b8d481215d80290"},
+  "folsom": {:hex, :folsom, "0.8.8", "9a2b02010f6727cb1948ef34e21cb66f3554b63355c3a31e8bcb10fb172c3170", [:rebar3], [{:bear, "0.8.7", [hex: :bear, repo: "hexpm", optional: false]}], "hexpm", "22daccb25764ac71c7c7c29964d7f9d4bb2c70858e0fd7816c2f630baca8f5c9"},
+  "jsx": {:hex, :jsx, "2.8.3", "a05252d381885240744d955fbe3cf810504eb2567164824e19303ea59eef62cf", [:mix, :rebar3], [], "hexpm", "fc3499fed7a726995aa659143a248534adc754ebd16ccd437cd93b649a95091f"},
 }

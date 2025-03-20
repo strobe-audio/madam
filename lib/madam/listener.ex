@@ -109,7 +109,7 @@ defmodule Madam.Listener do
   end
 
   defp handle_msg(msg, state) do
-    Logger.warn(fn -> ["Unhandled msg ", inspect(msg)] end)
+    Logger.warning(fn -> ["Unhandled msg ", inspect(msg)] end)
     state
   end
 

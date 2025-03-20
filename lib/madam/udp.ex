@@ -27,6 +27,8 @@ defmodule Madam.UDP do
 
   alias Madam.DNS
 
+  require Logger
+
   @address4 {224, 0, 0, 251}
   @port 5353
 
@@ -68,6 +70,7 @@ defmodule Madam.UDP do
 
   @impl GenServer
   def init({ifname, addrs}) do
+    Logger.info("UDP listening on #{ifname}")
     {:ok, socket} = open(ifname, addrs)
 
     {:ok, %{socket: socket, ifname: ifname, addrs: addrs}}
@@ -135,8 +138,8 @@ defmodule Madam.UDP do
   #   end
   # end
 
-  # @sol_socket 0xFFFF
-  # @so_reuseport 0x0200
+  @sol_socket 0xFFFF
+  @so_reuseport 0x0200
   # @so_reuseaddr 0x0004
 
   defp open(ifname, [addr | _]) do
@@ -151,8 +154,8 @@ defmodule Madam.UDP do
       {:broadcast, true},
       {:add_membership, {@address4, addr}},
       {:active, true},
-      {:bind_to_device, ifname}
-      # {:raw, @sol_socket, @so_reuseport, <<1::native-32>>}
+      {:bind_to_device, ifname},
+      {:raw, @sol_socket, @so_reuseport, <<1::native-32>>}
     ]
 
     :gen_udp.open(@port, udp4_options)

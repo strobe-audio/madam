@@ -1,5 +1,5 @@
 defmodule Madam.Network.Utils do
-  use Bitwise
+  import Bitwise
 
   def ip_to_i({a, b, c, d}) do
     (a <<< 24) + (b <<< 16) + (c <<< 8) + d
@@ -11,7 +11,7 @@ defmodule Madam.Network.Utils do
 end
 
 defmodule Madam.Network do
-  use Bitwise
+  import Bitwise
 
   import Madam.Network.Utils
 
@@ -31,14 +31,15 @@ defmodule Madam.Network do
   end
 
   defp reject_loopback_down({_, opts}) do
-    flags = Keyword.get(opts, :flags)
+    _flags = Keyword.get(opts, :flags)
 
     addrs =
       opts
       |> Keyword.get_values(:addr)
       |> Enum.reject(&is_ipv6_addr/1)
 
-    :loopback in flags || length(addrs) == 0
+    # :loopback in flags || length(addrs) == 0
+    length(addrs) == 0
   end
 
   defp is_ipv6_addr({_, _, _, _}), do: false

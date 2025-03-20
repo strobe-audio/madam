@@ -66,7 +66,7 @@ defmodule Madam.DNS do
 
   defmodule Query do
     @enforce_keys [:domain]
-    defstruct [:domain, type: :a, class: :in]
+    defstruct [:domain, type: :a, class: :in, unicast_response: false]
 
     def new(params) do
       struct(__MODULE__, params)
@@ -78,6 +78,7 @@ defmodule Madam.DNS do
           class: query.class,
           type: query.type,
           domain: to_charlist(query.domain)
+          # unicast_response: query.unicast_response
         )
       end
     end
@@ -100,7 +101,7 @@ defmodule Madam.DNS do
         to_charlist(k)
     end)
     |> case do
-      [] -> ['']
+      [] -> [~c()]
       data -> data
     end
   end
