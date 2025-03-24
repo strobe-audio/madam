@@ -287,7 +287,8 @@ defmodule Madam.Service do
       domain: Service.domain(service, false) |> to_charlist(),
       class: :in,
       ttl: service.ttl,
-      data: to_charlist(Service.instance_name(service, false))
+      data: to_charlist(Service.instance_name(service, false)),
+      flush: true
     }
 
     Logger.debug([
@@ -313,7 +314,8 @@ defmodule Madam.Service do
       domain: Service.instance_name(service, false) |> to_charlist(),
       class: :in,
       ttl: service.ttl,
-      data: {service.priority, service.weight, service.port, target}
+      data: {service.priority, service.weight, service.port, target},
+      flush: true
     }
 
     Logger.debug([
@@ -354,7 +356,7 @@ defmodule Madam.Service do
       ])
 
       [
-        %DNS.RR{type: type, domain: target, class: :in, ttl: service.ttl, data: ip}
+        %DNS.RR{type: type, domain: target, class: :in, ttl: service.ttl, data: ip, flush: true}
       ]
     end)
   end
@@ -367,7 +369,8 @@ defmodule Madam.Service do
       type: :txt,
       class: :in,
       ttl: service.ttl,
-      data: data
+      data: data,
+      flush: true
     }
 
     [txt]

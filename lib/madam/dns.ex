@@ -48,7 +48,7 @@ defmodule Madam.DNS do
   end
 
   defmodule RR do
-    defstruct [:type, :domain, :ttl, data: nil, class: :in]
+    defstruct [:type, :domain, :ttl, data: nil, class: :in, flush: true]
 
     def new(params) do
       struct(__MODULE__, params)
@@ -56,8 +56,14 @@ defmodule Madam.DNS do
 
     defimpl Encoder do
       def encode(rr) do
+        # inet_dns uses `func` for flush for some kind of twisted historical reason
+        # https://github.com/erlang/otp/blob/9834e606314df2c14970de9abeebdd7e3b14b505/lib/kernel/src/inet_dns.hrl#L224
         rr
         |> Map.from_struct()
+        |> Enum.map(fn
+          {:flush, flush?} -> {:func, flush?}
+          kv -> kv
+        end)
         |> Enum.reject(fn {_k, v} -> is_nil(v) end)
         |> :inet_dns.make_rr()
       end
@@ -87,7 +93,7 @@ defmodule Madam.DNS do
   def encode(msg) do
     msg
     |> Encoder.encode()
-    |> :inet_dns.encode()
+    |> :inet_dns.encode(_mdns = true)
   end
 
   def encode_txt(values) do

@@ -92,7 +92,7 @@ defmodule Madam.UDP do
 
   @impl GenServer
   def handle_info({:udp, _socket, addr, _port, data}, state) do
-    {:ok, record} = :inet_dns.decode(data)
+    {:ok, record} = :inet_dns.decode(data, _is_mdns = true)
 
     header = :inet_dns.header(:inet_dns.msg(record, :header))
 
